@@ -1,0 +1,489 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DataInsight v7.5 Tech - 商用專案自動化分析系統</title>
+    
+    <!-- 1. 核心樣式與字體 -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700;900&family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
+    
+    <!-- 2. 核心庫 -->
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
+    <script src="https://unpkg.com/prop-types@15.8.1/prop-types.min.js"></script>
+    <script src="https://unpkg.com/recharts@2.12.7/umd/Recharts.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+
+    <style>
+        body { 
+            font-family: 'Inter', 'Noto Sans TC', sans-serif; 
+            background-color: #f1f5f9; 
+            margin: 0; 
+            padding: 0; 
+            color: #334155;
+        }
+        .animate-fade-in { animation: fadeIn 0.3s ease-out both; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        
+        /* 柔和呼吸式動畫 (Opacity 漸變) */
+        @keyframes breathing-soft {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.45; }
+        }
+        .animate-breathing-soft { 
+            animation: breathing-soft 2.5s infinite ease-in-out;
+        }
+
+        /* 警示圖示呼吸閃爍特效 */
+        @keyframes icon-pulse-red {
+            0%, 100% { transform: scale(1); filter: drop-shadow(0 0 0px rgba(239, 68, 68, 0)); }
+            50% { transform: scale(1.1); filter: drop-shadow(0 0 10px rgba(239, 68, 68, 0.4)); }
+        }
+        .animate-icon-pulse { 
+            animation: icon-pulse-red 2.5s infinite ease-in-out;
+        }
+
+        .premium-shadow { box-shadow: 0 4px 20px -2px rgba(0, 0, 0, 0.05); }
+        .clickable-date { cursor: pointer; transition: all 0.2s; }
+        .clickable-date:hover { background-color: #e2e8f0 !important; color: #4f46e5 !important; }
+        .active-date-column { background-color: #eff6ff !important; border-radius: 8px; }
+        
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
+        
+        #loading-overlay {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: #ffffff; display: flex; flex-direction: column;
+            justify-content: center; align-items: center; z-index: 9999;
+        }
+        .spinner {
+            width: 40px; height: 40px; border: 4px solid #e2e8f0;
+            border-top: 4px solid #4f46e5; border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+
+        .date-picker-modal {
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+            animation: fadeIn 0.2s ease-out;
+        }
+    </style>
+</head>
+<body class="antialiased">
+    <div id="loading-overlay">
+        <div class="spinner"></div>
+        <p style="margin-top: 15px; font-weight: 800; color: #64748b; font-size: 14px;">正在初始化商用專案數據...</p>
+    </div>
+
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useMemo, useEffect, useRef } = React;
+        const { 
+            BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, 
+            ResponsiveContainer, PieChart, Pie, Cell, LineChart, Line, AreaChart, Area, ReferenceLine 
+        } = window.Recharts;
+
+        // --- 常量配置：僅保留商用專案 ---
+        const COMMERCIAL_ORDER = ['金猴爺', '金虎爺', '金好運娛樂城', '金好運娛樂城MY (TH,SG)', '金好運娛樂城JP', '海王寶藏', '撞球好手', '三國戰紀', 'Slotverse', '跑跑英雄'];
+        const ISSUE_TYPES = ["帳號問題", "伺服器相關問題", "儲值相關問題", "安裝、下載", "系統相關問題", "活動領獎問題", "規則設定問題", "反應與建議", "客戶服務", "行動版問題"];
+        const COLORS = ['#6366f1', '#0ea5e9', '#f59e0b', '#ec4899', '#8b5cf6', '#10b981', '#f43f5e', '#64748b', '#06b6d4', '#4f46e5'];
+
+        // --- 輔助工具：日期有效性檢查 ---
+        const safeParseDate = (dateStr) => {
+            if (!dateStr) return new Date();
+            const d = new Date(dateStr);
+            return isNaN(d.getTime()) ? new Date() : d;
+        };
+
+        const Icon = ({ name, size = 24, className = "" }) => {
+            useEffect(() => { if (window.lucide) window.lucide.createIcons(); }, [name]);
+            return <i data-lucide={name} className={className} style={{ width: size, height: size, display: 'inline-block' }}></i>;
+        };
+
+        // --- 自定義高階 Tooltip ---
+        const CustomTrendTooltip = ({ active, payload, label }) => {
+            if (active && payload && payload.length) {
+                const data = payload[0].payload;
+                const total = data.count;
+                return (
+                    <div className="bg-white/95 backdrop-blur-xl p-6 rounded-[2rem] shadow-2xl border border-slate-200 ring-1 ring-slate-100 min-w-[240px] animate-fade-in">
+                        <div className="flex flex-col gap-2 mb-4 border-b border-slate-100 pb-4">
+                            <div className="flex items-center gap-2">
+                                <Icon name="activity" size={14} className="text-slate-400" />
+                                <span className="text-xs font-black text-slate-500 uppercase tracking-widest">{label} {data.range ? `(${data.range})` : ''}</span>
+                            </div>
+                            <div className="flex justify-between items-center bg-slate-900 px-4 py-2 rounded-2xl shadow-lg shadow-slate-200">
+                                <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">區間總計</span>
+                                <span className="text-sm font-black text-white tabular-nums">{total.toLocaleString()}</span>
+                            </div>
+                        </div>
+
+                        <div className="space-y-2.5 max-h-[300px] overflow-y-auto pr-1">
+                            {ISSUE_TYPES.map((type, idx) => {
+                                const val = data[type] || 0;
+                                if (val === 0) return null;
+                                return (
+                                    <div key={type} className="flex justify-between items-center gap-6 group">
+                                        <div className="flex items-center gap-2.5">
+                                            <div className="w-2 h-2 rounded-full shadow-sm" style={{backgroundColor: COLORS[idx % COLORS.length]}}></div>
+                                            <span className="text-[11px] font-bold text-slate-600 group-hover:text-indigo-600 transition-colors">{type}</span>
+                                        </div>
+                                        <span className="text-[11px] font-black text-slate-800 tabular-nums">{val.toLocaleString()}</span>
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    </div>
+                );
+            }
+            return null;
+        };
+
+        const DatePicker = ({ selectedDate, onSelect, availableDates }) => {
+            const [isOpen, setIsOpen] = useState(false);
+            const [viewDate, setViewDate] = useState(() => safeParseDate(selectedDate));
+            const wrapperRef = useRef(null);
+
+            useEffect(() => { setViewDate(safeParseDate(selectedDate)); }, [selectedDate]);
+
+            useEffect(() => {
+                const handleClickOutside = (event) => {
+                    if (wrapperRef.current && !wrapperRef.current.contains(event.target)) setIsOpen(false);
+                };
+                document.addEventListener("mousedown", handleClickOutside);
+                return () => document.removeEventListener("mousedown", handleClickOutside);
+            }, []);
+
+            const generateDays = () => {
+                const year = viewDate.getFullYear();
+                const month = viewDate.getMonth();
+                const totalDays = new Date(year, month + 1, 0).getDate();
+                const firstDay = new Date(year, month, 1).getDay();
+                const days = [];
+
+                for (let i = 0; i < firstDay; i++) days.push(null);
+                for (let i = 1; i <= totalDays; i++) {
+                    const d = new Date(year, month, i);
+                    const yyyy = d.getFullYear();
+                    const mm = String(d.getMonth() + 1).padStart(2, '0');
+                    const dd = String(d.getDate()).padStart(2, '0');
+                    const dateStr = `${yyyy}-${mm}-${dd}`;
+                    days.push({ day: i, dateStr, isAvailable: availableDates.includes(dateStr) });
+                }
+                return days;
+            };
+
+            const changeMonth = (offset) => setViewDate(new Date(new Date(viewDate).setMonth(viewDate.getMonth() + offset)));
+
+            return (
+                <div className="relative" ref={wrapperRef}>
+                    <div 
+                        onClick={() => setIsOpen(!isOpen)}
+                        className="flex items-center gap-3 px-5 py-2.5 bg-white rounded-2xl border border-slate-200 shadow-sm cursor-pointer hover:border-indigo-400 transition-all select-none"
+                    >
+                        <Icon name="calendar" size={16} className="text-indigo-500" />
+                        <span className="text-sm font-black text-slate-700 tabular-nums">{selectedDate}</span>
+                        <Icon name="chevron-down" size={14} className={`text-slate-400 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
+                    </div>
+
+                    {isOpen && (
+                        <div className="absolute right-0 top-full mt-3 w-80 bg-white border border-slate-200 rounded-[2rem] p-6 z-[100] date-picker-modal">
+                            <div className="flex justify-between items-center mb-6">
+                                <button onClick={() => changeMonth(-1)} className="p-1.5 hover:bg-slate-100 rounded-lg text-slate-400"><Icon name="chevron-left" size={20} /></button>
+                                <div className="text-center">
+                                    <p className="text-sm font-black text-slate-800 uppercase tracking-widest">{!isNaN(viewDate.getTime()) ? viewDate.toLocaleString('zh-TW', { month: 'long' }) : '...'}</p>
+                                    <p className="text-[10px] font-black text-indigo-500">{viewDate.getFullYear()}</p>
+                                </div>
+                                <button onClick={() => changeMonth(1)} className="p-1.5 hover:bg-slate-100 rounded-lg text-slate-400"><Icon name="chevron-right" size={20} /></button>
+                            </div>
+                            <div className="grid grid-cols-7 gap-1 mb-2">
+                                {['日', '一', '二', '三', '四', '五', '六'].map(w => <div key={w} className="text-center text-[10px] font-black text-slate-400 py-2">{w}</div>)}
+                            </div>
+                            <div className="grid grid-cols-7 gap-1">
+                                {generateDays().map((d, i) => {
+                                    if (!d) return <div key={`empty-${i}`} className="p-2"></div>;
+                                    const isSelected = d.dateStr === selectedDate;
+                                    return (
+                                        <div key={d.dateStr} onClick={() => { if (d.isAvailable) { onSelect(d.dateStr); setIsOpen(false); } }} className={`p-2 text-center text-xs font-bold rounded-xl cursor-pointer transition-all ${d.isAvailable ? 'text-slate-700 hover:bg-indigo-50 hover:text-indigo-600' : 'text-slate-200 cursor-not-allowed'} ${isSelected ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-200' : ''}`}>{d.day}</div>
+                                    );
+                                })}
+                            </div>
+                        </div>
+                    )}
+                </div>
+            );
+        };
+
+        const StatCard = ({ title, value, prevValue, iconName, gradient }) => {
+            const diff = value - (prevValue || 0);
+            const percent = (prevValue && prevValue !== 0) ? ((diff / prevValue) * 100).toFixed(1) : 0;
+            return (
+                <div className="relative p-6 rounded-[2rem] bg-white border border-slate-100 premium-shadow group hover:-translate-y-1 transition-all duration-300">
+                    <div className="flex items-center justify-between mb-4">
+                        <p className="text-slate-400 text-[10px] font-black uppercase tracking-widest">{title}</p>
+                        <div className={`p-2.5 rounded-xl ${gradient} text-white shadow-lg`}><Icon name={iconName} size={18} /></div>
+                    </div>
+                    <div className="flex items-end gap-2">
+                        <h3 className="text-3xl font-black text-slate-800 tracking-tighter tabular-nums">{value.toLocaleString()}</h3>
+                        {percent !== 0 && (
+                            <div className={`flex items-center gap-0.5 text-[10px] font-black px-1.5 py-0.5 rounded-lg mb-1 ${diff >= 0 ? 'bg-rose-50 text-rose-600' : 'bg-emerald-50 text-emerald-600'}`}>
+                                {diff >= 0 ? <Icon name="arrow-up-right" size={12}/> : <Icon name="arrow-down-right" size={12}/>} {Math.abs(percent)}%
+                            </div>
+                        )}
+                    </div>
+                </div>
+            );
+        };
+
+        const IncidentItem = ({ incident, showDate = false }) => {
+            const [isExpanded, setIsExpanded] = useState(false);
+            const isCritical = incident.severity === 'critical';
+            return (
+                <div className={`mb-3 rounded-2xl transition-all duration-300 ring-1 ${isExpanded ? 'bg-white shadow-lg ring-slate-200 py-1' : 'bg-slate-50/50 ring-slate-100 hover:ring-slate-200'}`}>
+                    <div className="px-5 py-4 flex justify-between items-center cursor-pointer select-none" onClick={() => setIsExpanded(!isExpanded)}>
+                        <div className="flex items-center gap-3">
+                            <div className={`p-2 rounded-lg ${isCritical ? 'bg-rose-100 text-red-600' : 'bg-amber-100 text-amber-600'}`}><Icon name="alert-circle" size={16} /></div>
+                            <div>
+                                <span className={`font-black text-sm block ${isCritical ? 'text-rose-900' : 'text-slate-800'}`}>{incident.summary}</span>
+                                {showDate && <span className="text-[9px] font-black text-indigo-400 uppercase tracking-widest">{incident.date}</span>}
+                            </div>
+                        </div>
+                        <Icon name={isExpanded ? "chevron-up" : "chevron-down"} size={16} className="text-slate-400" />
+                    </div>
+                    {isExpanded && (
+                        <div className="px-5 pb-4 text-xs text-slate-600 leading-relaxed border-t border-slate-100 pt-3 bg-white rounded-b-2xl">
+                            {incident.description}
+                            <div className="mt-3 text-[9px] font-black text-slate-400 uppercase tracking-widest">{incident.time} 紀錄</div>
+                        </div>
+                    )}
+                </div>
+            );
+        };
+
+        const MajorEventsModule = ({ currentReport, database, selectedDate }) => {
+            const [searchTerm, setSearchTerm] = useState('');
+            useEffect(() => { setSearchTerm(''); }, [selectedDate]);
+
+            const rawIncidentsToday = currentReport?.majorIncidents || [];
+            const hasEventsToday = rawIncidentsToday.length > 0;
+            const isSearching = searchTerm.trim().length > 0;
+
+            const filteredResults = useMemo(() => {
+                if (!isSearching) return rawIncidentsToday;
+                const term = searchTerm.toLowerCase();
+                const globalMatches = [];
+                Object.entries(database).forEach(([date, dayData]) => {
+                    const incidents = dayData.commercial?.majorIncidents || [];
+                    incidents.forEach(inc => {
+                        if (inc.summary.toLowerCase().includes(term) || inc.description.toLowerCase().includes(term)) globalMatches.push({ ...inc, date });
+                    });
+                });
+                return globalMatches.sort((a, b) => b.date.localeCompare(a.date));
+            }, [database, searchTerm, rawIncidentsToday, isSearching]);
+
+            const titleText = isSearching ? `搜尋結果 (${filteredResults.length})` : (hasEventsToday ? "今日重大事件" : "本日無重大事件");
+            const titleColorClass = isSearching ? "text-indigo-600" : (hasEventsToday ? "text-red-600 animate-breathing-soft" : "text-slate-400");
+
+            return (
+                <div className="xl:col-span-1 bg-white p-10 rounded-[3.5rem] border border-slate-200 premium-shadow min-h-[600px] flex flex-col transition-all duration-500">
+                    <div className="flex items-center justify-between mb-8">
+                        <div className="flex items-center gap-4">
+                            <div className="relative">
+                                <Icon name={isSearching ? "search" : "alert-triangle"} size={36} className={isSearching ? "text-indigo-400" : (hasEventsToday ? 'text-red-500 animate-icon-pulse' : 'text-slate-200')} />
+                            </div>
+                            <h3 className={`font-black text-3xl tracking-tighter transition-all duration-500 ${titleColorClass}`}>{titleText}</h3>
+                        </div>
+                    </div>
+                    <div className="relative mb-6">
+                        <div className="absolute inset-y-0 left-4 flex items-center pointer-events-none"><Icon name="search" size={16} className="text-slate-400" /></div>
+                        <input type="search" placeholder="搜尋商用專案全歷史重大事件..." className="w-full pl-11 pr-4 py-3.5 bg-slate-50 border border-slate-100 rounded-2xl text-sm font-bold outline-none focus:ring-4 focus:ring-indigo-500/10 focus:bg-white transition-all shadow-inner" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
+                    </div>
+                    <div className="space-y-3 flex-grow overflow-y-auto pr-1">
+                        {filteredResults.length > 0 ? filteredResults.map((inc, i) => <IncidentItem key={inc.id || i} incident={inc} showDate={isSearching} />) : (
+                            <div className="flex flex-col items-center justify-center py-32 text-slate-300 gap-5 opacity-40 animate-fade-in">
+                                <Icon name={isSearching ? "search-x" : "shield-check"} size={72} className="text-slate-200" />
+                                <p className="font-black italic tracking-widest text-lg text-slate-400">{isSearching ? '查無符合條件' : '營運狀態：穩定'}</p>
+                            </div>
+                        )}
+                    </div>
+                </div>
+            );
+        };
+
+        const ProjectAnalysisRow = ({ name, trendData, timeScale, currentSelectedDate, onDateClick }) => {
+            const [isExpanded, setIsExpanded] = useState(false);
+            if (!trendData) return null;
+            const totalInView = trendData.reduce((s, a) => s + (a.count || 0), 0);
+            const avgValue = useMemo(() => totalInView / (trendData.length || 1), [totalInView, trendData]);
+
+            const customizedDot = (props) => {
+                const { cx, cy, payload } = props;
+                if (payload.count > avgValue * 1.3) { 
+                    return (
+                        <g key={`peak-${payload.name}`}><circle cx={cx} cy={cy} r={7} fill="#f43f5e" stroke="#fff" strokeWidth={2} className="animate-pulse" /><text x={cx} y={cy - 12} fill="#f43f5e" fontSize="10" fontVariant="900" textAnchor="middle">PEAK</text></g>
+                    );
+                }
+                return <circle key={`dot-${payload.name}`} cx={cx} cy={cy} r={4} fill="#fff" stroke="#6366f1" strokeWidth={2} />;
+            };
+
+            return (
+                <div className={`rounded-[2.5rem] transition-all duration-500 border border-transparent mb-4 ${isExpanded ? 'bg-white shadow-xl ring-1 ring-indigo-100' : 'bg-white border-slate-100 hover:border-indigo-200 hover:shadow-lg'} premium-shadow`}>
+                    <div className="px-8 py-7 flex items-center justify-between cursor-pointer select-none" onClick={() => setIsExpanded(!isExpanded)}>
+                        <div className="flex items-center gap-6 w-72 shrink-0">
+                            <div className={`p-3.5 rounded-2xl transition-all shadow-md ${isExpanded ? 'bg-indigo-600 text-white' : 'bg-slate-50 text-slate-400'}`}><Icon name={isExpanded ? "chevron-down" : "chevron-right"} size={24} /></div>
+                            <div><span className="font-black text-slate-800 text-xl tracking-tight block">{name}</span><p className="text-[10px] font-black text-slate-400 uppercase mt-1 leading-none">商用專案趨勢</p></div>
+                        </div>
+                        <div className="flex-grow h-14 max-w-lg mx-10 opacity-40">
+                            <ResponsiveContainer width="100%" height="100%"><LineChart data={trendData}><Line type="monotone" dataKey="count" stroke="#6366f1" strokeWidth={2.5} dot={false} isAnimationActive={false} /></LineChart></ResponsiveContainer>
+                        </div>
+                        <div className="text-right w-40 border-l border-slate-100 pl-8 shrink-0"><p className={`text-3xl font-black tabular-nums ${isExpanded ? 'text-indigo-600' : 'text-slate-800'}`}>{totalInView.toLocaleString()}</p></div>
+                    </div>
+                    {isExpanded && (
+                        <div className="px-10 pb-10 animate-fade-in border-t border-slate-50 pt-10">
+                            <div className="grid grid-cols-1 gap-12">
+                                <div className="bg-white p-10 rounded-[3rem] border border-slate-100 shadow-sm relative">
+                                    <div className="flex items-center gap-3 text-slate-500 mb-10"><Icon name="activity" size={18} /><h4 className="text-sm font-black uppercase tracking-widest text-slate-900">營運進線趨勢分析 ({timeScale === 'weekly' ? '週維度' : '日維度'})</h4></div>
+                                    <div className="h-[400px] w-full">
+                                        <ResponsiveContainer width="100%" height="100%">
+                                            <LineChart data={trendData} margin={{ left: -20, right: 30 }}>
+                                                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                                                <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fontSize: 11, fontWeight: 800, fill: '#94a3b8'}} />
+                                                <YAxis axisLine={false} tickLine={false} tick={{fontSize: 11, fontWeight: 800, fill: '#94a3b8'}} />
+                                                <Tooltip content={<CustomTrendTooltip />} cursor={{ stroke: '#e2e8f0', strokeWidth: 1.5 }} />
+                                                <ReferenceLine y={avgValue} stroke="#e2e8f0" strokeDasharray="5 5" />
+                                                <Line type="monotone" dataKey="count" stroke="#6366f1" strokeWidth={4} dot={customizedDot} activeDot={{ r: 8, strokeWidth: 0, fill: '#4f46e5' }} />
+                                            </LineChart>
+                                        </ResponsiveContainer>
+                                    </div>
+                                </div>
+                                <div className="bg-white rounded-[2rem] border border-slate-200 shadow-sm overflow-x-auto">
+                                    <table className="w-full text-left border-collapse">
+                                        <thead><tr className="text-slate-400 font-black text-[11px] uppercase border-b border-slate-50"><th className="pl-8 py-6 min-w-[150px] bg-slate-50/50">問題類型</th>{trendData.map(d => <th key={d.name} className="text-center py-6 bg-slate-50/50">{d.name}</th>)}<th className="text-right pr-8 py-6 bg-slate-50/50 font-black text-indigo-600">合計</th></tr></thead>
+                                        <tbody>
+                                            {ISSUE_TYPES.map((cat, idx) => {
+                                                const rowTotal = trendData.reduce((sum, d) => sum + (d[cat] || 0), 0);
+                                                if (rowTotal === 0) return null;
+                                                return (<tr key={cat} className={`hover:bg-slate-50 transition-colors border-b border-slate-50 ${idx % 2 === 0 ? 'bg-white' : 'bg-slate-50/20'}`}><td className="font-bold text-slate-600 pl-8 py-5 text-xs">{cat}</td>{trendData.map(d => <td key={d.name} className="text-center text-xs font-bold text-slate-500">{(d[cat] || 0).toLocaleString()}</td>)}<td className="text-right pr-8 font-black text-indigo-500 text-xs">{rowTotal.toLocaleString()}</td></tr>);
+                                            })}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+                </div>
+            );
+        };
+
+        function App() {
+            const [timeScale, setTimeScale] = useState('daily');
+            const [selectedDate, setSelectedDate] = useState('');
+            const [database, setDatabase] = useState({});
+
+            useEffect(() => {
+                const db = {}; const startDate = new Date('2025-11-01');
+                for (let i = 0; i < 125; i++) {
+                    const d = new Date(startDate); d.setDate(startDate.getDate() + i); const dateStr = d.toISOString().split('T')[0];
+                    const makeMockStats = (base) => ({ tickets: base + Math.floor(Math.random()*100), phoneCalls: 60, emails: 280, alertMails: 20, redmineReplies: 120 });
+                    db[dateStr] = { commercial: { stats: makeMockStats(300), majorIncidents: dateStr === '2026-02-10' ? [{id:2, severity:'critical', summary:'商用驗證 API 延遲', description:'KYC 系統響應逾時。', time:'10:15'}] : [], gameStats: {} } };
+                    COMMERCIAL_ORDER.forEach(g => {
+                        const data = { count: 0 };
+                        ISSUE_TYPES.forEach(c => { const v = 15+Math.floor(Math.random()*40); data[c] = v; data.count += v; });
+                        db[dateStr].commercial.gameStats[g] = data;
+                    });
+                }
+                setDatabase(db); setSelectedDate(Object.keys(db).sort().reverse()[0]);
+                setTimeout(() => document.getElementById('loading-overlay').style.display = 'none', 1000);
+            }, []);
+
+            const datesList = useMemo(() => Object.keys(database).sort().reverse(), [database]);
+            const currentReport = database[selectedDate]?.commercial || null;
+            const prevReport = database[datesList[datesList.indexOf(selectedDate)+1]]?.commercial || null;
+            const chartData = useMemo(() => {
+                if (!currentReport || !currentReport.gameStats) return [];
+                const data = COMMERCIAL_ORDER.map(name => { const d = currentReport.gameStats[name] || { count: 0 }; return { name, ...d }; });
+                const total = data.reduce((s, a) => s + a.count, 0) || 1;
+                return data.map(d => ({ ...d, percent: ((d.count / total) * 100).toFixed(1) })).sort((a,b) => b.count - a.count);
+            }, [currentReport]);
+
+            const getProjectTrendData = (projectName) => {
+                const startIndex = datesList.indexOf(selectedDate);
+                if (startIndex === -1) return [];
+                if (timeScale === 'weekly') {
+                    const weeks = [];
+                    for (let i = 0; i < 8; i++) {
+                        const offset = startIndex + (i * 7);
+                        const weekRange = datesList.slice(offset, offset + 7);
+                        if (weekRange.length === 0) continue;
+                        const weekObj = { name: `W${8-i}`, count: 0, range: `${weekRange[weekRange.length-1].slice(5)}~${weekRange[0].slice(5)}` };
+                        ISSUE_TYPES.forEach(type => weekObj[type] = 0);
+                        weekRange.forEach(dateStr => {
+                            const dayData = database[dateStr]?.commercial?.gameStats?.[projectName];
+                            if (dayData) { weekObj.count += dayData.count || 0; ISSUE_TYPES.forEach(t => weekObj[t] += (dayData[t] || 0)); }
+                        });
+                        weeks.push(weekObj);
+                    }
+                    return weeks.reverse();
+                } else {
+                    const dates = datesList.slice(startIndex, startIndex + 7).reverse();
+                    return dates.map(dateKey => ({ name: dateKey.slice(5), fullDate: dateKey, ...(database[dateKey]?.commercial?.gameStats?.[projectName] || { count: 0 }) }));
+                }
+            };
+
+            return (
+                <div className="min-h-screen pb-24 animate-fade-in">
+                    <header className="sticky top-0 z-50 bg-white/90 backdrop-blur-xl border-b border-slate-200/80 h-20 flex items-center shadow-sm">
+                        <div className="max-w-screen-2xl mx-auto px-8 w-full flex justify-between items-center">
+                            <div className="flex items-center gap-4">
+                                <div className="bg-slate-900 p-2.5 rounded-2xl shadow-lg rotate-2"><Icon name="shield-check" className="text-white" /></div>
+                                <div><h1 className="font-black text-2xl tracking-tighter text-slate-900 leading-none">DataInsight <span className="bg-indigo-600 text-white text-[9px] px-2 py-0.5 rounded uppercase ml-2">v7.5 Tech</span></h1><p className="text-[9px] text-slate-400 font-black tracking-widest uppercase mt-1">商用專案決策矩陣</p></div>
+                            </div>
+                            <div className="flex items-center gap-3">
+                                <button onClick={() => { const idx = datesList.indexOf(selectedDate); if(idx < datesList.length-1) setSelectedDate(datesList[idx+1]); }} className="p-2.5 bg-white border border-slate-200 rounded-xl text-slate-400 hover:text-indigo-600 transition-all active:scale-90" disabled={datesList.indexOf(selectedDate) >= datesList.length-1}><Icon name="chevron-left" size={18} /></button>
+                                <DatePicker selectedDate={selectedDate} availableDates={datesList} onSelect={setSelectedDate} />
+                                <button onClick={() => { const idx = datesList.indexOf(selectedDate); if(idx > 0) setSelectedDate(datesList[idx-1]); }} className="p-2.5 bg-white border border-slate-200 rounded-xl text-slate-400 hover:text-indigo-600 transition-all active:scale-90" disabled={datesList.indexOf(selectedDate) <= 0}><Icon name="chevron-right" size={18} /></button>
+                            </div>
+                        </div>
+                    </header>
+                    <main className="max-w-screen-2xl mx-auto px-8 mt-10">
+                        {currentReport && (
+                            <div className="animate-fade-in">
+                                <div className="grid grid-cols-1 md:grid-cols-5 gap-6 mb-12">
+                                    <StatCard title="問題回報" value={currentReport.stats.tickets} prevValue={prevReport?.stats.tickets} iconName="file-text" gradient="bg-indigo-600" />
+                                    <StatCard title="電話進線" value={currentReport.stats.phoneCalls} prevValue={prevReport?.stats.phoneCalls} iconName="phone" gradient="bg-emerald-600" />
+                                    <StatCard title="信箱回報" value={currentReport.stats.emails} prevValue={prevReport?.stats.emails} iconName="mail" gradient="bg-purple-600" />
+                                    <StatCard title="警示信件" value={currentReport.stats.alertMails} prevValue={prevReport?.stats.alertMails} iconName="activity" gradient="bg-rose-600" />
+                                    <StatCard title="Redmine回單" value={currentReport.stats.redmineReplies} prevValue={prevReport?.stats.redmineReplies} iconName="clipboard-check" gradient="bg-amber-600" />
+                                </div>
+                                <div className="grid grid-cols-1 xl:grid-cols-3 gap-10 mb-12 items-start">
+                                    <MajorEventsModule currentReport={currentReport} database={database} selectedDate={selectedDate} activeTab="commercial" />
+                                    <div className="xl:col-span-2 bg-white p-10 rounded-[3.5rem] border border-slate-200 premium-shadow min-h-[600px] overflow-hidden">
+                                        <h3 className="font-black text-slate-900 text-3xl tracking-tighter flex items-center gap-3 mb-12"><Icon name="layers" className="text-indigo-600" size={28}/> 商用專案問題排行 ({selectedDate})</h3>
+                                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-10">
+                                            <div className="h-[420px]"><ResponsiveContainer width="100%" height="100%"><BarChart data={chartData} layout="vertical" margin={{ left: 10, right: 100 }}><CartesianGrid strokeDasharray="3 3" horizontal={true} vertical={false} stroke="#f1f5f9" /><XAxis type="number" hide /><YAxis dataKey="name" type="category" width={110} tick={{ fontSize: 11, fontWeight: 900, fill: '#64748b' }} axisLine={false} tickLine={false} /><Bar dataKey="count" radius={[0, 10, 10, 0]} barSize={20} fill="#4f46e5" label={{ position: 'right', fill: '#1e293b', fontSize: 10, fontWeight: 900, offset: 12, formatter: (val) => `${val}件 (${chartData.find(d=>d.count===val)?.percent}%)` }}>{chartData.map((e, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}</Bar></BarChart></ResponsiveContainer></div>
+                                            <div className="h-[420px] flex flex-col items-center"><ResponsiveContainer width="100%" height="100%"><PieChart><Pie data={chartData.filter(d=>d.count>0).map(d=>({name:d.name, value:d.count}))} cx="50%" cy="45%" labelLine={true} label={({ cx, cy, midAngle, innerRadius, outerRadius, percent, name, value }) => <text x={cx + (innerRadius + (outerRadius - innerRadius) * 1.6) * Math.cos(-midAngle * (Math.PI / 180))} y={cy + (innerRadius + (outerRadius - innerRadius) * 1.6) * Math.sin(-midAngle * (Math.PI / 180))} fill="#64748b" textAnchor={cx + (innerRadius + (outerRadius - innerRadius) * 1.6) * Math.cos(-midAngle * (Math.PI / 180)) > cx ? 'start' : 'end'} dominantBaseline="central" fontSize="10" fontWeight="900">{`${name} ${value}件`}</text>} outerRadius={95} innerRadius={60} paddingAngle={4} dataKey="value">{chartData.map((entry, index) => <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} stroke="#fff" strokeWidth={3} />)}</Pie><Tooltip /></PieChart></ResponsiveContainer></div>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div className="bg-white p-10 rounded-[4rem] border border-slate-200 premium-shadow mb-20 overflow-hidden">
+                                    <div className="flex justify-between items-center mb-12">
+                                        <div className="flex items-center gap-4"><div className="bg-indigo-600 p-3.5 rounded-[1.5rem] shadow-lg shadow-indigo-200"><Icon name="trending-up" className="text-white" size={26}/></div><h3 className="font-black text-slate-900 text-3xl tracking-tight">商用專案數據連動分析</h3></div>
+                                        <div className="flex bg-slate-100 p-2 rounded-[1.5rem] shadow-inner"><button onClick={() => setTimeScale('daily')} className={`px-8 py-2.5 rounded-[1.2rem] text-xs font-black transition-all ${timeScale === 'daily' ? 'bg-white text-indigo-600 shadow-md ring-1 ring-slate-200' : 'text-slate-400'}`}>日維度</button><button onClick={() => setTimeScale('weekly')} className={`px-8 py-2.5 rounded-[1.2rem] text-xs font-black transition-all ${timeScale === 'weekly' ? 'bg-white text-indigo-600 shadow-md ring-1 ring-slate-200' : 'text-slate-400'}`}>週維度</button></div>
+                                    </div>
+                                    <div className="space-y-6">{COMMERCIAL_ORDER.map(name => <ProjectAnalysisRow key={name} name={name} timeScale={timeScale} trendData={getProjectTrendData(name)} currentSelectedDate={selectedDate} onDateClick={setSelectedDate} />)}</div>
+                                </div>
+                            </div>
+                        )}
+                    </main>
+                    <footer className="mt-10 border-t border-slate-200 py-16 opacity-30 text-center"><Icon name="shield-check" size={32} className="text-slate-400 mb-4 inline-block"/><p className="text-[10px] font-black tracking-[0.4em] uppercase text-slate-500">DataInsight Matrix v7.5 Commercial Edition</p></footer>
+                </div>
+            );
+        }
+        const root = ReactDOM.createRoot(document.getElementById('root')); root.render(<App />);
+    </script>
+</body>
+</html>
