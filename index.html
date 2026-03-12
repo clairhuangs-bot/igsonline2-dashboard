@@ -1,315 +1,74 @@
 <!DOCTYPE html>
 <html lang="zh-TW">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>DataInsight v7.5 戰情室 - 客服班長決策面板</title>
-    
-    <!-- 1. 核心樣式與字體 -->
-    <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700;900&family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
-    
-    <!-- 2. 核心庫 -->
-    <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
-    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
-    <script src="https://unpkg.com/prop-types@15.8.1/prop-types.min.js"></script>
-    <script src="https://unpkg.com/recharts@2.12.7/umd/Recharts.js"></script>
-    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
-    <script src="https://unpkg.com/lucide@latest"></script>
+<meta charset="UTF-8">
+<title>IGS Dashboard Portal</title>
 
-    <style>
-        body { 
-            font-family: 'Inter', 'Noto Sans TC', sans-serif; 
-            background-color: #f8fafc; 
-            margin: 0; 
-            padding: 0; 
-            color: #1e293b;
-        }
-        .animate-fade-in { animation: fadeIn 0.4s ease-out both; }
-        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
-        
-        /* 營運燈號呼吸效果 */
-        @keyframes breathing-green {
-            0%, 100% { box-shadow: 0 0 0px rgba(34, 197, 94, 0); transform: scale(1); }
-            50% { box-shadow: 0 0 20px rgba(34, 197, 94, 0.4); transform: scale(1.05); }
-        }
-        @keyframes breathing-yellow {
-            0%, 100% { box-shadow: 0 0 0px rgba(234, 179, 8, 0); transform: scale(1); }
-            50% { box-shadow: 0 0 20px rgba(234, 179, 8, 0.4); transform: scale(1.05); }
-        }
-        @keyframes breathing-red {
-            0%, 100% { box-shadow: 0 0 0px rgba(239, 68, 68, 0); transform: scale(1); }
-            50% { box-shadow: 0 0 25px rgba(239, 68, 68, 0.5); transform: scale(1.1); }
-        }
-        .status-light-green { background: #22c55e; animation: breathing-green 2.5s infinite; }
-        .status-light-yellow { background: #eab308; animation: breathing-yellow 2.5s infinite; }
-        .status-light-red { background: #ef4444; animation: breathing-red 2s infinite; }
+<style>
+body{
+font-family:Arial;
+background:#0f172a;
+color:white;
+display:flex;
+align-items:center;
+justify-content:center;
+height:100vh;
+margin:0;
+}
 
-        .premium-shadow { box-shadow: 0 10px 30px -5px rgba(0, 0, 0, 0.04), 0 4px 6px -2px rgba(0, 0, 0, 0.02); }
-        .executive-gradient { background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%); }
-        
-        #loading-overlay {
-            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-            background: #ffffff; display: flex; flex-direction: column;
-            justify-content: center; align-items: center; z-index: 9999;
-        }
-        .spinner {
-            width: 40px; height: 40px; border: 4px solid #f1f5f9;
-            border-top: 4px solid #6366f1; border-radius: 50%;
-            animation: spin 1s linear infinite;
-        }
-        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+.container{
+text-align:center;
+}
 
-        ::-webkit-scrollbar { width: 6px; }
-        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
-    </style>
+button{
+width:260px;
+padding:20px;
+margin:20px;
+font-size:20px;
+border:none;
+border-radius:10px;
+cursor:pointer;
+}
+
+.online{
+background:#4f46e5;
+color:white;
+}
+
+.commercial{
+background:#f59e0b;
+color:white;
+}
+
+button:hover{
+transform:scale(1.05);
+}
+</style>
 </head>
-<body class="antialiased">
-    <div id="loading-overlay">
-        <div class="spinner"></div>
-        <p style="margin-top: 15px; font-weight: 800; color: #64748b; font-size: 14px;">正在進入戰情數據中心...</p>
-    </div>
 
-    <div id="root"></div>
+<body>
 
-    <script type="text/babel">
-        const { useState, useMemo, useEffect, useRef } = React;
-        const { 
-            BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, 
-            ResponsiveContainer, PieChart, Pie, Cell, LineChart, Line, AreaChart, Area, ReferenceLine 
-        } = window.Recharts;
+<div class="container">
 
-        // --- 常量配置 ---
-        const ONLINE_ORDER = ['明星3缺1', '滿貫大亨', '捕魚大玩咖', '唯舞獨尊', '競技麻將2', '儲值專線', 'Vegas Frenzy', '大滿貫', '玩星派對', '幸運拉霸GO'];
-        const ISSUE_TYPES = ["帳號問題", "伺服器相關問題", "儲值相關問題", "安裝、下載", "系統相關問題", "活動領獎問題", "規則設定問題", "反應與建議", "客戶服務", "行動版問題"];
-        const COLORS = ['#6366f1', '#0ea5e9', '#f59e0b', '#ec4899', '#8b5cf6', '#10b981', '#f43f5e', '#64748b', '#06b6d4', '#4f46e5'];
+<h1>IGS DataInsight Dashboard</h1>
 
-        const Icon = ({ name, size = 24, className = "" }) => {
-            useEffect(() => { if (window.lucide) window.lucide.createIcons(); }, [name]);
-            return <i data-lucide={name} className={className} style={{ width: size, height: size, display: 'inline-block' }}></i>;
-        };
+<p>選擇系統</p>
 
-        // --- 1. [新增] 班長部報組件 (Chief's Briefing) ---
-        const ChiefBriefing = ({ report, date }) => {
-            if (!report) return null;
-            const statusLabels = {
-                stable: { label: '全線營運穩定', class: 'status-light-green', text: 'text-emerald-500', bg: 'bg-emerald-50' },
-                warning: { label: '局部產線異動', class: 'status-light-yellow', text: 'text-amber-500', bg: 'bg-amber-50' },
-                critical: { label: '重度營運風險', class: 'status-light-red', text: 'text-rose-500', bg: 'bg-rose-50' }
-            };
-            const currentStatus = statusLabels[report.healthStatus || 'stable'];
+<br>
 
-            return (
-                <div className="mb-10 bg-white rounded-[3rem] p-8 border border-slate-100 premium-shadow animate-fade-in">
-                    <div className="flex flex-col lg:flex-row gap-10">
-                        {/* 左側：營運燈號 */}
-                        <div className="flex flex-col items-center justify-center shrink-0 lg:w-64 border-r border-slate-50 pr-5">
-                            <div className={`w-28 h-28 rounded-full mb-5 flex items-center justify-center ${currentStatus.class}`}>
-                                <Icon name="shield-check" size={40} className="text-white" />
-                            </div>
-                            <h4 className={`text-xl font-black ${currentStatus.text}`}>{currentStatus.label}</h4>
-                            <p className="text-[10px] font-black text-slate-400 tracking-[0.3em] uppercase mt-1">Health Status</p>
-                        </div>
+<button class="online"
+onclick="location.href='online.html'">
+線上遊戲專案
+</button>
 
-                        {/* 中間：班長總結 */}
-                        <div className="flex-grow">
-                            <div className="flex items-center gap-3 mb-4">
-                                <span className="bg-slate-900 text-white text-[10px] font-black px-3 py-1 rounded-full uppercase tracking-widest">本日班長彙報</span>
-                                <span className="text-xs font-black text-slate-400">{date} 營運摘要</span>
-                            </div>
-                            <h2 className="text-2xl font-black text-slate-800 leading-snug mb-6">
-                                {report.briefSummary || "今日各遊戲案場營運狀態良好，進線量處於常態分佈範圍內。"}
-                            </h2>
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                {report.actionPoints?.map((point, i) => (
-                                    <div key={i} className={`p-4 rounded-2xl flex items-start gap-4 ${currentStatus.bg}`}>
-                                        <div className="mt-1"><Icon name="check-circle" size={16} className={currentStatus.text} /></div>
-                                        <p className="text-sm font-bold text-slate-700 leading-relaxed">{point}</p>
-                                    </div>
-                                ))}
-                            </div>
-                        </div>
+<br>
 
-                        {/* 右側：處理效能指標 */}
-                        <div className="lg:w-72 shrink-0 bg-slate-50/50 rounded-[2rem] p-6 border border-slate-100">
-                            <h5 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4">團隊執行效率 (本日)</h5>
-                            <div className="space-y-4">
-                                <div>
-                                    <div className="flex justify-between text-xs font-black mb-1.5"><span className="text-slate-500">問題即時處理率</span><span className="text-indigo-600">92%</span></div>
-                                    <div className="h-2 bg-slate-200 rounded-full overflow-hidden"><div className="h-full bg-indigo-500 rounded-full" style={{width: '92%'}}></div></div>
-                                </div>
-                                <div>
-                                    <div className="flex justify-between text-xs font-black mb-1.5"><span className="text-slate-500">研發回單速度 (Avg)</span><span className="text-emerald-600">45m</span></div>
-                                    <div className="h-2 bg-slate-200 rounded-full overflow-hidden"><div className="h-full bg-emerald-500 rounded-full" style={{width: '78%'}}></div></div>
-                                </div>
-                                <div className="pt-4 border-t border-slate-100">
-                                    <div className="flex items-center gap-2 text-rose-500"><Icon name="clock" size={12} /><span className="text-[10px] font-black uppercase tracking-widest">掛單中事項：12 件</span></div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            );
-        };
+<button class="commercial"
+onclick="location.href='commercial.html'">
+商用遊戲專案
+</button>
 
-        // --- 統計卡片 ---
-        const StatCard = ({ title, value, prevValue, iconName, gradient }) => {
-            const diff = value - (prevValue || 0);
-            const percent = (prevValue && prevValue !== 0) ? ((diff / prevValue) * 100).toFixed(1) : 0;
-            return (
-                <div className="relative p-6 rounded-[2rem] bg-white border border-slate-100 premium-shadow group hover:-translate-y-1 transition-all duration-300">
-                    <div className="flex items-center justify-between mb-4">
-                        <p className="text-slate-400 text-[10px] font-black uppercase tracking-widest">{title}</p>
-                        <div className={`p-2.5 rounded-xl ${gradient} text-white shadow-lg`}><Icon name={iconName} size={18} /></div>
-                    </div>
-                    <div className="flex items-end gap-2">
-                        <h3 className="text-3xl font-black text-slate-800 tracking-tighter tabular-nums">{value.toLocaleString()}</h3>
-                        {percent !== 0 && (
-                            <div className={`flex items-center gap-0.5 text-[10px] font-black px-1.5 py-0.5 rounded-lg mb-1 ${diff >= 0 ? 'bg-rose-50 text-rose-600' : 'bg-emerald-50 text-emerald-600'}`}>
-                                {diff >= 0 ? <Icon name="arrow-up-right" size={12}/> : <Icon name="arrow-down-right" size={12}/>} {Math.abs(percent)}%
-                            </div>
-                        )}
-                    </div>
-                </div>
-            );
-        };
+</div>
 
-        // --- 日期選擇器 ---
-        const DatePicker = ({ selectedDate, onSelect, availableDates }) => {
-            const [isOpen, setIsOpen] = useState(false);
-            const wrapperRef = useRef(null);
-            useEffect(() => {
-                const handleClickOutside = (event) => { if (wrapperRef.current && !wrapperRef.current.contains(event.target)) setIsOpen(false); };
-                document.addEventListener("mousedown", handleClickOutside); return () => document.removeEventListener("mousedown", handleClickOutside);
-            }, []);
-            return (
-                <div className="relative" ref={wrapperRef}>
-                    <div onClick={() => setIsOpen(!isOpen)} className="flex items-center gap-3 px-6 py-3 bg-white rounded-2xl border border-slate-200 shadow-sm cursor-pointer hover:border-indigo-400 transition-all select-none">
-                        <Icon name="calendar" size={16} className="text-indigo-500" />
-                        <span className="text-sm font-black text-slate-700 tabular-nums">{selectedDate}</span>
-                        <Icon name="chevron-down" size={14} className={`text-slate-400 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
-                    </div>
-                    {isOpen && (
-                        <div className="absolute right-0 top-full mt-3 w-64 bg-white border border-slate-200 rounded-[1.5rem] p-4 z-[100] max-h-60 overflow-y-auto premium-shadow">
-                            {availableDates.map(d => (
-                                <div key={d} onClick={() => { onSelect(d); setIsOpen(false); }} className={`p-3 text-xs font-bold rounded-xl cursor-pointer transition-all mb-1 ${d === selectedDate ? 'bg-indigo-600 text-white' : 'hover:bg-slate-100 text-slate-600'}`}>{d}</div>
-                            ))}
-                        </div>
-                    )}
-                </div>
-            );
-        };
-
-        function App() {
-            const [selectedDate, setSelectedDate] = useState('');
-            const [database, setDatabase] = useState({});
-
-            useEffect(() => {
-                const db = {}; const startDate = new Date('2026-02-01');
-                for (let i = 0; i < 40; i++) {
-                    const d = new Date(startDate); d.setDate(startDate.getDate() + i); const dateStr = d.toISOString().split('T')[0];
-                    const makeMockStats = (base) => ({ tickets: base + Math.floor(Math.random()*100), phoneCalls: 60, emails: 280, alertMails: 20, redmineReplies: 120 });
-                    
-                    // 模擬不同狀態的數據
-                    let healthStatus = 'stable';
-                    let briefSummary = '全產線運作正常，今日進線趨勢穩定，無突發之重大系統性問題。';
-                    let actionPoints = ['例行監測各遊戲金流銜接狀況', '各專案回單速度維持在 1 小時內'];
-                    let specialInsights = {};
-
-                    if (dateStr === '2026-03-12') {
-                        healthStatus = 'warning';
-                        briefSummary = '明星3缺1 受新版活動上線影響，領獎相關問題進線量上升 20%，已引導營運發布公告。';
-                        actionPoints = ['明星3缺1：活動系統延遲已回報研發及時排查', '儲值專線：遠傳電信金流維修中，已設置自動回覆導引'];
-                        specialInsights = { '明星3缺1': '件數飆升主因為「週年慶活動」領獎機制延遲', '儲值專線': '遠傳外部金流維護，非內部系統故障' };
-                    }
-
-                    db[dateStr] = { general: { 
-                        stats: makeMockStats(500), 
-                        healthStatus, briefSummary, actionPoints,
-                        majorIncidents: dateStr === '2026-03-12' ? [{ summary: "明星3缺1 活動伺服器延遲", time: "15:20" }] : [], 
-                        gameStats: {} 
-                    } };
-                    ONLINE_ORDER.forEach(g => {
-                        const count = 50 + Math.floor(Math.random()*80);
-                        db[dateStr].general.gameStats[g] = { count, insight: specialInsights[g] || (count > 100 ? '數據波動分析中' : '營運健康') };
-                    });
-                }
-                setDatabase(db); setSelectedDate(Object.keys(db).sort().reverse()[0]);
-                setTimeout(() => document.getElementById('loading-overlay').style.display = 'none', 1000);
-            }, []);
-
-            const datesList = useMemo(() => Object.keys(database).sort().reverse(), [database]);
-            const currentReport = database[selectedDate]?.general || null;
-            const prevReport = database[datesList[datesList.indexOf(selectedDate)+1]]?.general || null;
-            const chartData = useMemo(() => {
-                if (!currentReport || !currentReport.gameStats) return [];
-                return ONLINE_ORDER.map(name => ({ name, ...currentReport.gameStats[name] })).sort((a,b) => b.count - a.count);
-            }, [currentReport]);
-
-            return (
-                <div className="min-h-screen pb-24">
-                    <header className="sticky top-0 z-50 bg-white/90 backdrop-blur-xl border-b border-slate-200/80 h-20 flex items-center shadow-sm">
-                        <div className="max-w-screen-2xl mx-auto px-8 w-full flex justify-between items-center">
-                            <div className="flex items-center gap-4">
-                                <div className="bg-slate-900 p-2.5 rounded-2xl shadow-lg rotate-2"><Icon name="shield-check" className="text-white" /></div>
-                                <div><h1 className="font-black text-2xl tracking-tighter text-slate-900 leading-none">DataInsight <span className="bg-indigo-600 text-white text-[9px] px-2 py-0.5 rounded uppercase ml-2">v7.5 戰情版</span></h1><p className="text-[9px] text-slate-400 font-black tracking-widest uppercase mt-1">客服主管決策儀表板</p></div>
-                            </div>
-                            <DatePicker selectedDate={selectedDate} availableDates={datesList} onSelect={setSelectedDate} />
-                        </div>
-                    </header>
-                    <main className="max-w-screen-2xl mx-auto px-8 mt-8">
-                        {currentReport && (
-                            <>
-                                {/* [新增] 班長部報面板 */}
-                                <ChiefBriefing report={currentReport} date={selectedDate} />
-
-                                <div className="grid grid-cols-1 md:grid-cols-5 gap-6 mb-12">
-                                    <StatCard title="今日進線量" value={currentReport.stats.tickets} prevValue={prevReport?.stats.tickets} iconName="file-text" gradient="bg-indigo-600" />
-                                    <StatCard title="電話流量" value={currentReport.stats.phoneCalls} prevValue={prevReport?.stats.phoneCalls} iconName="phone" gradient="bg-emerald-600" />
-                                    <StatCard title="郵件回報" value={currentReport.stats.emails} prevValue={prevReport?.stats.emails} iconName="mail" gradient="bg-purple-600" />
-                                    <StatCard title="警示信件" value={currentReport.stats.alertMails} prevValue={prevReport?.stats.alertMails} iconName="activity" gradient="bg-rose-600" />
-                                    <StatCard title="紅單處理" value={currentReport.stats.redmineReplies} prevValue={prevReport?.stats.redmineReplies} iconName="clipboard-check" gradient="bg-amber-600" />
-                                </div>
-
-                                <div className="bg-white p-10 rounded-[3.5rem] border border-slate-200 premium-shadow mb-12 overflow-hidden">
-                                    <div className="flex items-center gap-4 mb-10"><Icon name="layers" className="text-indigo-600" size={32}/><h3 className="font-black text-slate-900 text-3xl tracking-tighter">線上專案營運現狀分析</h3></div>
-                                    <div className="h-[500px] w-full">
-                                        <ResponsiveContainer width="100%" height="100%">
-                                            <BarChart data={chartData} layout="vertical" margin={{ left: 50, right: 150 }}>
-                                                <CartesianGrid strokeDasharray="3 3" horizontal={true} vertical={false} stroke="#f1f5f9" />
-                                                <XAxis type="number" hide />
-                                                <YAxis dataKey="name" type="category" width={120} tick={{ fontSize: 13, fontWeight: 900, fill: '#1e293b' }} axisLine={false} tickLine={false} />
-                                                <Tooltip cursor={{fill: '#f8fafc'}} />
-                                                <Bar dataKey="count" radius={[0, 15, 15, 0]} barSize={25} fill="#4f46e5">
-                                                    {chartData.map((entry, index) => <Cell key={index} fill={COLORS[index % COLORS.length]} />)}
-                                                    {/* [新增] 條形圖旁的洞察文字標籤 */}
-                                                    <label dataKey="insight" />
-                                                </Bar>
-                                            </BarChart>
-                                        </ResponsiveContainer>
-                                    </div>
-                                    <div className="mt-6 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                                        {chartData.map((d, i) => (
-                                            <div key={i} className="flex justify-between items-center p-4 bg-slate-50 rounded-2xl border border-slate-100">
-                                                <div className="flex items-center gap-3"><div className="w-2 h-2 rounded-full" style={{backgroundColor: COLORS[i % COLORS.length]}}></div><span className="font-bold text-sm text-slate-700">{d.name}</span></div>
-                                                <div className="text-right">
-                                                    <div className="text-sm font-black text-slate-900">{d.count} 件</div>
-                                                    <div className={`text-[9px] font-black uppercase px-2 py-0.5 rounded ${d.count > 110 ? 'bg-rose-100 text-rose-600' : 'bg-slate-200 text-slate-500'}`}>{d.insight}</div>
-                                                </div>
-                                            </div>
-                                        ))}
-                                    </div>
-                                </div>
-                            </>
-                        )}
-                    </main>
-                    <footer className="mt-10 border-t border-slate-200 py-12 text-center opacity-30">
-                        <p className="text-[10px] font-black tracking-[0.4em] uppercase text-slate-500">DataInsight Matrix v7.5 Chief Dashboard</p>
-                    </footer>
-                </div>
-            );
-        }
-        const root = ReactDOM.createRoot(document.getElementById('root')); root.render(<App />);
-    </script>
 </body>
 </html>
