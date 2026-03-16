@@ -183,6 +183,27 @@
             );
         };
 
+        // --- 2.5 [新增] 統計卡片 (Stat Card) ---
+        const StatCard = ({ title, value, iconName = "activity", gradient = "bg-indigo-600" }) => (
+            <div className={`p-6 rounded-[2rem] text-white ${gradient} shadow-lg relative overflow-hidden card-hover`}>
+                <div className="relative z-10 flex flex-col h-full justify-between gap-4">
+                    <div className="flex justify-between items-start">
+                        <span className="text-[10px] font-black uppercase tracking-widest opacity-80">{title}</span>
+                        <Icon name={iconName} size={16} className="opacity-50" />
+                    </div>
+                    <div>
+                        <div className="text-3xl font-black tabular-nums tracking-tighter">
+                            {value ? value.toLocaleString() : 0}
+                        </div>
+                    </div>
+                </div>
+                {/* 裝飾背景 */}
+                <div className="absolute -right-6 -bottom-6 opacity-10 rotate-12 scale-150 pointer-events-none">
+                    <Icon name={iconName} size={100} />
+                </div>
+            </div>
+        );
+
         // --- 3. [優化] 專案診斷卡 (Project Diagnostic Card) ---
         const ProjectDiagnosticCard = ({ name, data, color }) => {
             const isCritical = data.count > 115;
@@ -398,11 +419,11 @@
                                         </div>
                                         
                                         <div className="lg:w-2/3 grid grid-cols-2 md:grid-cols-5 gap-6">
-                                            <StatCard title="核心進線" value={aggregatedReport.stats.tickets} prevValue={prevReport?.stats.tickets} iconName="file-text" gradient="bg-indigo-600" />
-                                            <StatCard title="電話支援" value={aggregatedReport.stats.phoneCalls} gradient="bg-emerald-600" />
-                                            <StatCard title="郵件深度" value={aggregatedReport.stats.emails} gradient="bg-purple-600" />
-                                            <StatCard title="預警警示" value={aggregatedReport.stats.alertMails} gradient="bg-rose-600" />
-                                            <StatCard title="研發聯動" value={aggregatedReport.stats.redmineReplies} gradient="bg-amber-600" />
+                                            <StatCard title="核心進線" value={aggregatedReport.stats.tickets} iconName="file-text" gradient="bg-indigo-600" />
+                                            <StatCard title="電話支援" value={aggregatedReport.stats.phoneCalls} iconName="phone-call" gradient="bg-emerald-600" />
+                                            <StatCard title="郵件深度" value={aggregatedReport.stats.emails} iconName="mail" gradient="bg-purple-600" />
+                                            <StatCard title="預警警示" value={aggregatedReport.stats.alertMails} iconName="alert-triangle" gradient="bg-rose-600" />
+                                            <StatCard title="研發聯動" value={aggregatedReport.stats.redmineReplies} iconName="git-merge" gradient="bg-amber-600" />
                                         </div>
                                     </div>
                                 </div>
